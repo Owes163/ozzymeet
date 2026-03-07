@@ -15,8 +15,11 @@ async function bootstrap() {
     ];
     console.log('✅ Allowed CORS Origins:', origins);
     app.enableCors({
-        origin: "*",
-        credentials: true,
+        origin: [
+            "http://localhost:5173",
+            "https://ozzymeet.vercel.app"
+        ],
+        credentials: true
     });
     await app.listen(process.env.PORT || 3001, '0.0.0.0');
     console.log(`🚀 Backend running on port ${process.env.PORT || 3001}`);
