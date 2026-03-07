@@ -6,6 +6,8 @@ import useWebRTC from '../hooks/useWebRTC.js';
 import VideoTile from '../components/VideoTile.jsx';
 import Controls from '../components/Controls.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
+import MeetingTimer from "../components/MeetingTimer";
+import InviteMenu from "../components/InviteMenu";
 import { API_URL, socket } from '../services/socket.js';
 
 export default function RoomPage() {
@@ -208,6 +210,11 @@ export default function RoomPage() {
                     <h1>OzzyMeet</h1>
                 </div>
                 <div className="room-header-right">
+
+                     <MeetingTimer />
+
+                    <InviteMenu />
+                          
                     <div className="room-info">
                         <span className="room-info-dot" />
                         <span>{slug}</span>
