@@ -3,7 +3,7 @@ OzzyMeet – WebRTC Video Meeting App 🎥
 OzzyMeet is a real-time video conferencing application inspired by Google Meet.
 It allows users to create and join meeting rooms where they can communicate through video, audio, and chat using WebRTC technology.
 
-This project demonstrates a full-stack real-time communication system built using React, NestJS, WebRTC, and Socket.io.
+This project demonstrates a full-stack real-time communication system using React, NestJS, WebRTC, and Socket.io.
 
 🚀 Features
 
@@ -40,7 +40,7 @@ Backend
 
 NestJS
 
-Socket.io (WebSocket signaling)
+Socket.io (WebSocket signaling server)
 
 Prisma ORM
 
@@ -61,7 +61,7 @@ ozzymeet
 │   └── package.json
 │
 └── README.md
-⚙️ Installation & Setup
+⚙️ Installation
 1️⃣ Clone the repository
 git clone https://github.com/Owes163/ozzymeet.git
 cd ozzymeet
@@ -82,6 +82,14 @@ npm run dev
 Frontend runs on:
 
 http://localhost:5173
+🌐 Live Demo
+
+Frontend
+https://ozzymeet.vercel.app
+
+Backend
+https://ozzymeet-backend.onrender.com
+
 👨‍💻 Author
 
 Owes Shaikh
