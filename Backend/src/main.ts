@@ -21,12 +21,9 @@ async function bootstrap() {
   console.log('✅ Allowed CORS Origins:', origins);
 
   app.enableCors({
-    origin: [
-    "http://localhost:5173",
-    "https://ozzymeet.vercel.app"
-  ],
-    credentials: true
-  });
+  origin: "*",
+  credentials: true,
+});
 
   // 3. IMPORTANT: Allow Railway to assign the port automatically
   await app.listen(process.env.PORT || 3001, '0.0.0.0');
