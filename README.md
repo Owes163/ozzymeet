@@ -82,23 +82,7 @@ npm run dev
 Frontend runs on:
 
 http://localhost:5173
-📸 Demo
 
-Open the application:
-
-http://localhost:5173
-
-Create a meeting and share the invite link with others to join the call.
-
-🌐 Live Deployment
-
-Frontend (Vercel)
-
-https://ozzymeet.vercel.app
-
-Backend (Render)
-
-https://ozzymeet-backend.onrender.com
 👨‍💻 Author
 
 Owes Shaikh
