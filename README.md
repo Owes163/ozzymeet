@@ -99,18 +99,6 @@ http://localhost:5173
 
 ---
 
-## 📸 Demo
-
-Open the app and create a meeting:
-
-```
-http://localhost:5173
-```
-
-Share the meeting link with friends to join the call.
-
----
-
 ## 👨‍💻 Author
 
 **Owes Shaikh**
