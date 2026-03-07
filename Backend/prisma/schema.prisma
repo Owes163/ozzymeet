@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Room {
+  id           String        @id @default(uuid())
+  slug         String        @unique
+  createdAt    DateTime      @default(now())
+  participants Participant[]
+  messages     Message[]
+}
+
+model Participant {
+  id       String   @id @default(cuid())
+  socketId String   @unique
+  name     String?
+  roomId   String
+  room     Room     @relation(fields: [roomId], references: [id])
+  joinedAt DateTime @default(now())
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  roomId     String
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderName String
+  content    String
+  createdAt  DateTime @default(now())
+}
