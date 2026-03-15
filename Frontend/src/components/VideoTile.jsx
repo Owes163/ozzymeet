@@ -30,11 +30,11 @@ export default function VideoTile({
         >
             {/* Always keep video in DOM so srcObject persists; hide visually when off */}
             <video
-  ref={videoRef}
-  autoPlay
-  playsInline
-  muted
-/>
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            />
 
             {isVideoOff && (
                 <div className="video-tile-avatar">
