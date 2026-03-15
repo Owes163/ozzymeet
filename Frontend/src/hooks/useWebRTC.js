@@ -75,13 +75,20 @@ export default function useWebRTC(localStream, slug, userName) {
 
         // When remote stream received
         pc.ontrack = (event) => {
-            const [remoteStream] = event.streams;
 
-            setRemoteStreams(prev => ({
-                ...prev,
-                [remoteSocketId]: remoteStream
-            }));
-        };
+    let remoteStream = event.streams && event.streams[0];
+
+    // Mobile fallback
+    if (!remoteStream) {
+        remoteStream = new MediaStream();
+        remoteStream.addTrack(event.track);
+    }
+
+    setRemoteStreams((prev) => ({
+        ...prev,
+        [remoteSocketId]: remoteStream,
+    }));
+};
 
         // If connection fails remove peer
         pc.oniceconnectionstatechange = () => {
