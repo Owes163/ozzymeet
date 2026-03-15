@@ -7,23 +7,15 @@ STUN → helps find public IP
 TURN → relays media when direct connection fails (important for mobile networks)
 */
 const ICE_SERVERS = {
-    iceServers: [
-        // Google STUN servers
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-
-        // Free public TURN server (important for mobile networks)
-        {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-        },
-        {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-        }
-    ],
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject"
+    }
+  ]
 };
 
 export default function useWebRTC(localStream, slug, userName) {
