@@ -1,213 +1,325 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { socket } from '../services/socket.js';
 
+/*
+ICE SERVERS CONFIGURATION
+STUN → helps find public IP
+TURN → relays media when direct connection fails (important for mobile networks)
+*/
 const ICE_SERVERS = {
     iceServers: [
+        // Google STUN servers
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+
+        // Free public TURN server (important for mobile networks)
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        }
     ],
 };
 
 export default function useWebRTC(localStream, slug, userName) {
-    const peersRef = useRef({});            // socketId -> RTCPeerConnection
-    const iceCandidateQueue = useRef({});    // socketId -> RTCIceCandidate[]
-    const [remoteStreams, setRemoteStreams] = useState({}); // socketId -> MediaStream
-    const [peerNames, setPeerNames] = useState({});        // socketId -> userName
-    const [screenSharer, setScreenSharer] = useState(null); // socketId of who is sharing
 
-    const createPeerConnection = useCallback(
-        (remoteSocketId) => {
-            if (peersRef.current[remoteSocketId]) {
-                return peersRef.current[remoteSocketId];
-            }
+    // Store all peer connections
+    const peersRef = useRef({});
 
-            const pc = new RTCPeerConnection(ICE_SERVERS);
+    // Queue ICE candidates if remote description not ready
+    const iceCandidateQueue = useRef({});
 
-            // Add local tracks
-            if (localStream) {
-                localStream.getTracks().forEach((track) => {
-                    pc.addTrack(track, localStream);
+    // Store remote streams
+    const [remoteStreams, setRemoteStreams] = useState({});
+
+    // Store participant names
+    const [peerNames, setPeerNames] = useState({});
+
+    // Track who is screen sharing
+    const [screenSharer, setScreenSharer] = useState(null);
+
+
+    /*
+    CREATE PEER CONNECTION
+    This creates WebRTC connection with another user
+    */
+    const createPeerConnection = useCallback((remoteSocketId) => {
+
+        if (peersRef.current[remoteSocketId]) {
+            return peersRef.current[remoteSocketId];
+        }
+
+        const pc = new RTCPeerConnection({
+            ...ICE_SERVERS,
+            iceCandidatePoolSize: 10
+        });
+
+        // Add local tracks (camera + microphone)
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+        }
+
+        // Send ICE candidates to remote peer
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('ice-candidate', {
+                    target: remoteSocketId,
+                    candidate: event.candidate.toJSON(),
                 });
             }
+        };
 
-            // Handle ICE candidates
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('ice-candidate', {
-                        target: remoteSocketId,
-                        candidate: event.candidate.toJSON(),
-                    });
-                }
-            };
+        // When remote stream received
+        pc.ontrack = (event) => {
+            const [remoteStream] = event.streams;
 
-            // Handle remote stream
-            pc.ontrack = (event) => {
-                const [remoteStream] = event.streams;
-                setRemoteStreams((prev) => ({
-                    ...prev,
-                    [remoteSocketId]: remoteStream,
-                }));
-            };
+            setRemoteStreams(prev => ({
+                ...prev,
+                [remoteSocketId]: remoteStream
+            }));
+        };
 
-            pc.oniceconnectionstatechange = () => {
-                if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-                    removePeer(remoteSocketId);
-                }
-            };
+        // If connection fails remove peer
+        pc.oniceconnectionstatechange = () => {
+            if (
+                pc.iceConnectionState === 'disconnected' ||
+                pc.iceConnectionState === 'failed'
+            ) {
+                removePeer(remoteSocketId);
+            }
+        };
 
-            peersRef.current[remoteSocketId] = pc;
-            iceCandidateQueue.current[remoteSocketId] = [];
+        peersRef.current[remoteSocketId] = pc;
+        iceCandidateQueue.current[remoteSocketId] = [];
 
-            return pc;
-        },
-        [localStream]
-    );
+        return pc;
 
+    }, [localStream]);
+
+
+    /*
+    REMOVE PEER CONNECTION
+    */
     const removePeer = useCallback((socketId) => {
+
         if (peersRef.current[socketId]) {
             peersRef.current[socketId].close();
             delete peersRef.current[socketId];
         }
+
         delete iceCandidateQueue.current[socketId];
-        setRemoteStreams((prev) => {
+
+        setRemoteStreams(prev => {
             const next = { ...prev };
             delete next[socketId];
             return next;
         });
-        setPeerNames((prev) => {
+
+        setPeerNames(prev => {
             const next = { ...prev };
             delete next[socketId];
             return next;
         });
-        setScreenSharer((prev) => (prev === socketId ? null : prev));
+
+        setScreenSharer(prev => prev === socketId ? null : prev);
+
     }, []);
 
+
+    /*
+    ADD QUEUED ICE CANDIDATES
+    */
     const flushIceCandidates = useCallback(async (socketId) => {
+
         const pc = peersRef.current[socketId];
         const queue = iceCandidateQueue.current[socketId] || [];
+
         for (const candidate of queue) {
             try {
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
             } catch (err) {
-                console.error('Error adding queued ICE candidate:', err);
+                console.error('Error adding ICE candidate:', err);
             }
         }
+
         iceCandidateQueue.current[socketId] = [];
+
     }, []);
 
-    // Replace video track in all peer connections (used for screen sharing)
+
+    /*
+    REPLACE VIDEO TRACK
+    Used during screen sharing
+    */
     const replaceVideoTrack = useCallback((newTrack) => {
-        Object.values(peersRef.current).forEach((pc) => {
-            const senders = pc.getSenders();
-            const videoSender = senders.find((s) => s.track?.kind === 'video');
-            if (videoSender) {
-                videoSender.replaceTrack(newTrack);
+
+        Object.values(peersRef.current).forEach(pc => {
+
+            const sender = pc.getSenders().find(
+                s => s.track?.kind === 'video'
+            );
+
+            if (sender) {
+                sender.replaceTrack(newTrack);
             }
+
         });
+
     }, []);
+
 
     useEffect(() => {
+
         if (!localStream || !slug) return;
 
-        // Connect socket if not connected
+        // Connect socket if not already connected
         if (!socket.connected) {
             socket.connect();
         }
 
-        // When we receive the list of existing users (now with names), create offers
+
+        /*
+        WHEN USER JOINS ROOM
+        */
         const handleAllUsers = async (users) => {
+
             for (const user of users) {
+
                 const remoteId = user.socketId;
                 const remoteName = user.userName;
 
-                // Store the peer's name
-                setPeerNames((prev) => ({ ...prev, [remoteId]: remoteName }));
+                setPeerNames(prev => ({
+                    ...prev,
+                    [remoteId]: remoteName
+                }));
 
                 const pc = createPeerConnection(remoteId);
-                try {
-                    const offer = await pc.createOffer();
-                    await pc.setLocalDescription(offer);
-                    socket.emit('offer', {
-                        target: remoteId,
-                        sdp: pc.localDescription,
-                    });
-                } catch (err) {
-                    console.error('Error creating offer:', err);
-                }
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                socket.emit('offer', {
+                    target: remoteId,
+                    sdp: pc.localDescription
+                });
+
             }
+
         };
 
-        // Handle incoming offer (now includes callerName)
+
+        /*
+        HANDLE OFFER
+        */
         const handleOffer = async ({ sdp, caller, callerName }) => {
+
             if (callerName) {
-                setPeerNames((prev) => ({ ...prev, [caller]: callerName }));
+                setPeerNames(prev => ({
+                    ...prev,
+                    [caller]: callerName
+                }));
             }
 
             const pc = createPeerConnection(caller);
-            try {
-                await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-                await flushIceCandidates(caller);
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socket.emit('answer', {
-                    target: caller,
-                    sdp: pc.localDescription,
-                });
-            } catch (err) {
-                console.error('Error handling offer:', err);
-            }
+
+            await pc.setRemoteDescription(
+                new RTCSessionDescription(sdp)
+            );
+
+            await flushIceCandidates(caller);
+
+            const answer = await pc.createAnswer();
+
+            await pc.setLocalDescription(answer);
+
+            socket.emit('answer', {
+                target: caller,
+                sdp: pc.localDescription
+            });
+
         };
 
-        // Handle incoming answer (now includes answererName)
+
+        /*
+        HANDLE ANSWER
+        */
         const handleAnswer = async ({ sdp, answerer, answererName }) => {
+
             if (answererName) {
-                setPeerNames((prev) => ({ ...prev, [answerer]: answererName }));
+                setPeerNames(prev => ({
+                    ...prev,
+                    [answerer]: answererName
+                }));
             }
 
             const pc = peersRef.current[answerer];
+
             if (pc) {
-                try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-                    await flushIceCandidates(answerer);
-                } catch (err) {
-                    console.error('Error handling answer:', err);
-                }
+
+                await pc.setRemoteDescription(
+                    new RTCSessionDescription(sdp)
+                );
+
+                await flushIceCandidates(answerer);
+
             }
+
         };
 
-        // Handle incoming ICE candidate (queue if remote description not set)
+
+        /*
+        HANDLE ICE CANDIDATES
+        */
         const handleIceCandidate = ({ candidate, from }) => {
+
             const pc = peersRef.current[from];
+
             if (pc && pc.remoteDescription) {
-                pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) =>
-                    console.error('Error adding ICE candidate:', err)
+
+                pc.addIceCandidate(
+                    new RTCIceCandidate(candidate)
                 );
+
             } else {
+
                 if (!iceCandidateQueue.current[from]) {
                     iceCandidateQueue.current[from] = [];
                 }
+
                 iceCandidateQueue.current[from].push(candidate);
+
             }
+
         };
 
-        // Handle user joined notification (with name)
-        const handleUserJoined = ({ socketId: remoteId, userName: remoteName }) => {
-            console.log('User joined:', remoteId, remoteName);
-            setPeerNames((prev) => ({ ...prev, [remoteId]: remoteName }));
+
+        /*
+        USER JOINED
+        */
+        const handleUserJoined = ({ socketId, userName }) => {
+
+            setPeerNames(prev => ({
+                ...prev,
+                [socketId]: userName
+            }));
+
         };
 
-        // Handle user left
+
+        /*
+        USER LEFT
+        */
         const handleUserLeft = ({ socketId }) => {
             removePeer(socketId);
         };
 
-        // Handle screen share events from remote peers
-        const handleScreenShareStarted = ({ socketId }) => {
-            setScreenSharer(socketId);
-        };
-        const handleScreenShareStopped = ({ socketId }) => {
-            setScreenSharer((prev) => (prev === socketId ? null : prev));
-        };
 
         socket.on('all-users', handleAllUsers);
         socket.on('offer', handleOffer);
@@ -215,30 +327,38 @@ export default function useWebRTC(localStream, slug, userName) {
         socket.on('ice-candidate', handleIceCandidate);
         socket.on('user-joined', handleUserJoined);
         socket.on('user-left', handleUserLeft);
-        socket.on('screen-share-started', handleScreenShareStarted);
-        socket.on('screen-share-stopped', handleScreenShareStopped);
 
-        // Join the room
+        // Join room
         socket.emit('join-room', { slug, userName });
 
+
         return () => {
+
             socket.off('all-users', handleAllUsers);
             socket.off('offer', handleOffer);
             socket.off('answer', handleAnswer);
             socket.off('ice-candidate', handleIceCandidate);
             socket.off('user-joined', handleUserJoined);
             socket.off('user-left', handleUserLeft);
-            socket.off('screen-share-started', handleScreenShareStarted);
-            socket.off('screen-share-stopped', handleScreenShareStopped);
 
-            // Close all peer connections
             Object.keys(peersRef.current).forEach(removePeer);
 
-            // NOTE: Do NOT call socket.disconnect() here — the socket is shared
-            // with ChatPanel and other components. Disconnecting it here would
-            // destroy chat listeners and clear chat history on re-renders.
         };
-    }, [localStream, slug, userName, createPeerConnection, flushIceCandidates, removePeer]);
 
-    return { remoteStreams, peerNames, screenSharer, replaceVideoTrack };
+    }, [
+        localStream,
+        slug,
+        userName,
+        createPeerConnection,
+        flushIceCandidates,
+        removePeer
+    ]);
+
+
+    return {
+        remoteStreams,
+        peerNames,
+        screenSharer,
+        replaceVideoTrack
+    };
 }
