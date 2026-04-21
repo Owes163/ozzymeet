@@ -41,7 +41,7 @@ export default function RoomPage() {
         isVideoEnabled && !isScreenSharing
     );
 
-    const { remoteStreams, peerNames, screenSharer, replaceVideoTrack, replaceAudioTrack  } = useWebRTC(
+    const { remoteStreams, peerNames, screenSharer, replaceVideoTrack } = useWebRTC(
         nameSubmitted ? processedStream : null,
         nameSubmitted ? slug : null,
         userName
@@ -302,8 +302,6 @@ export default function RoomPage() {
                 isChatOpen={isChatOpen}
                 chatUnread={chatUnread}
                 onLeave={handleLeave}
-                 localStream={processedStream || localStream}
-                 replaceAudioTrack={replaceAudioTrack}  
             />
         </div>
     );

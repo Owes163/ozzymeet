@@ -1,62 +1,62 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 export default function VideoTile({
-    stream,
-    name,
-    isLocal,
-    isMuted,
-    isVideoOff,
-    isPinned,
-    isScreenShare,
-    onClick,
+  stream,
+  name,
+  isLocal,
+  isMuted,
+  isVideoOff,
+  isPinned,
+  isScreenShare,
+  onClick,
 }) {
-    const videoRef = useRef(null);
+  const videoRef = useRef(null);
 
-    // Re-assign srcObject whenever the stream changes OR when the video
-    // element remounts (e.g. after toggling camera back on).
-    useEffect(() => {
-        if (videoRef.current && stream) {
-            videoRef.current.srcObject = stream;
-        }
-    }, [stream, isVideoOff]);
+  // attach stream to video
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
 
-    const initial = name ? name.charAt(0).toUpperCase() : '?';
+      // 🔥 IMPORTANT: sirf local mute
+      videoRef.current.muted = isLocal;
 
-    return (
-        <div
-            className={`video-tile ${isLocal ? 'local mirror' : ''} ${isPinned ? 'pinned' : ''} ${isScreenShare ? 'screen-share' : ''}`}
-            onClick={onClick}
-            title={onClick ? 'Click to pin/unpin' : undefined}
-        >
-            {/* Always keep video in DOM so srcObject persists; hide visually when off */}
-            <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            />
+      // autoplay fix
+      videoRef.current.play().catch(() => {});
+    }
+  }, [stream, isLocal]);
 
-            {isVideoOff && (
-                <div className="video-tile-avatar">
-                    <div className="avatar-circle">{initial}</div>
-                </div>
-            )}
+  const initial = name ? name.charAt(0).toUpperCase() : "?";
 
-            <div className="video-tile-label">
-                <span>
-                    {isScreenShare && '🖥️ '}
-                    {isLocal ? `${name} (You)` : name}
-                    {isScreenShare && ' — Presenting'}
-                </span>
-            </div>
+  return (
+    <div
+      className={`video-tile ${isLocal ? "local" : ""}`}
+      onClick={onClick}
+    >
+      {/* video */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isLocal} // ❗ main fix
+      />
 
-            {isMuted && (
-                <div className="video-tile-muted" title="Muted">🔇</div>
-            )}
-
-            {isPinned && (
-                <div className="video-tile-pin" title="Pinned">📌</div>
-            )}
+      {/* avatar when video off */}
+      {isVideoOff && (
+        <div className="video-avatar">
+          <div className="avatar">{initial}</div>
         </div>
-    );
+      )}
+
+      {/* name */}
+      <div className="video-name">
+        {isLocal ? `${name} (You)` : name}
+      </div>
+
+      {/* mute icon */}
+      {isMuted && <div className="mute-icon">🔇</div>}
+
+      {/* pin */}
+      {isPinned && <div className="pin">📌</div>}
+    </div>
+  );
 }

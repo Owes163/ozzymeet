@@ -14,28 +14,8 @@ export default function Controls({
     onToggleScreenShare,
     onToggleChat,
     onLeave,
-
-    // 🔥 ADD THIS (important)
-    localStream,
-    replaceAudioTrack
 }) {
     const [isBgOpen, setIsBgOpen] = useState(false);
-
-    // 🔥 MIC HANDLER (MAIN FIX)
-    const handleMic = () => {
-        const audioTrack = localStream?.getAudioTracks()[0];
-
-        if (!audioTrack) return;
-
-        // toggle mic
-        audioTrack.enabled = !audioTrack.enabled;
-
-        // 🔥 IMPORTANT: update WebRTC peers
-        replaceAudioTrack(localStream);
-
-        // UI update
-        onToggleAudio();
-    };
 
     return (
         <div className="controls-container">
@@ -48,16 +28,16 @@ export default function Controls({
                     />
                 </div>
             )}
-
             <div className="controls-bar">
-
-                {/* 🔥 MIC BUTTON FIXED */}
                 <button
                     id="toggle-mic"
                     className={`control-btn ${isAudioEnabled ? 'on' : 'off'}`}
-                    onClick={handleMic}
+                    onClick={onToggleAudio}
                 >
                     {isAudioEnabled ? '🎤' : '🔇'}
+                    <span className="tooltip">
+                        {isAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                    </span>
                 </button>
 
                 <button
@@ -66,6 +46,9 @@ export default function Controls({
                     onClick={onToggleVideo}
                 >
                     {isVideoEnabled ? '📹' : '📷'}
+                    <span className="tooltip">
+                        {isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+                    </span>
                 </button>
 
                 <button
@@ -74,6 +57,7 @@ export default function Controls({
                     onClick={() => setIsBgOpen(!isBgOpen)}
                 >
                     ✨
+                    <span className="tooltip">Virtual Background</span>
                 </button>
 
                 <button
@@ -82,6 +66,9 @@ export default function Controls({
                     onClick={onToggleScreenShare}
                 >
                     {isScreenSharing ? '🟢' : '🖥️'}
+                    <span className="tooltip">
+                        {isScreenSharing ? 'Stop presenting' : 'Present your screen'}
+                    </span>
                 </button>
 
                 <button
@@ -94,6 +81,9 @@ export default function Controls({
                     {!isChatOpen && chatUnread > 0 && (
                         <span className="chat-unread-badge">{chatUnread}</span>
                     )}
+                    <span className="tooltip">
+                        {isChatOpen ? 'Close chat' : 'Open chat'}
+                    </span>
                 </button>
 
                 <button
@@ -102,8 +92,8 @@ export default function Controls({
                     onClick={onLeave}
                 >
                     📞
+                    <span className="tooltip">Leave meeting</span>
                 </button>
-
             </div>
         </div>
     );
